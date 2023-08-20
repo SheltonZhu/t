@@ -7,6 +7,8 @@ require (
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.4
+	github.com/tvdburgt/go-argon2 v0.0.0-20181109175329-49d0f0e5973c
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 )
 
 require (
