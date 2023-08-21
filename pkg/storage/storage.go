@@ -56,7 +56,7 @@ type IFileStorage interface {
 type FileStorage struct {
 	FileGetSaveCleaner
 	ConcurrencyLimit uint
-	afterResponse    []func(*[]byte)
+	afterResponse    []func(*FileStorage, *[]byte)
 }
 
 // SaveFileBytes 通过传入bytes保存文件
@@ -79,7 +79,7 @@ func (fs *FileStorage) GetFileBytes(filePath string) ([]byte, error) {
 		return nil, err
 	}
 	for _, h := range fs.afterResponse {
-		h(&fileBytes)
+		h(fs, &fileBytes)
 	}
 	return fileBytes, nil
 }
@@ -121,7 +121,7 @@ func (fs *FileStorage) BatchCleanFiles(filePaths []string) []error {
 }
 
 // SetResponseHandle 设置响应体hook函数
-func (fs *FileStorage) OnAfterResponse(f func(*[]byte)) *FileStorage {
+func (fs *FileStorage) OnAfterResponse(f func(*FileStorage, *[]byte)) *FileStorage {
 	fs.afterResponse = append(fs.afterResponse, f)
 	return fs
 }

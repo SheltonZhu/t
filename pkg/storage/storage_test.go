@@ -41,7 +41,7 @@ func TestLocalDiskFileStorage(t *testing.T) {
 
 	// 修改响应值
 	newBytes := []byte("12345")
-	storage.OnAfterResponse(func(bs *[]byte) { *bs = newBytes })
+	storage.OnAfterResponse(func(fs *FileStorage, bs *[]byte) { *bs = newBytes })
 	retrievedContent, err = storage.GetFileBytes(fileName)
 	assert.NoError(t, err, "Failed to read file content")
 	assert.Equal(t, newBytes, retrievedContent, "Retrieved file content does not match")
@@ -139,11 +139,15 @@ func TestHttpFileStorage(t *testing.T) {
 			WithHttpBasicAuth("user", "user"),
 			SetDebug(),
 			SetHttps(),
-			OnBeforeGetFile(func(r *resty.Request) {
+			OnBeforeGetFile(func(s *httpFileStorage, r *resty.Request) {
 				r.SetQueryParam("test", "1")
 			}),
-			OnBeforeSaveFile(func(r *resty.Request) {
+			OnAfterSaveFile(func(hfs *httpFileStorage, r *resty.Response) {
+				assert.Equal(t, r.Body(), []byte("This is a test file."))
+			}),
+			OnBeforeSaveFile(func(s *httpFileStorage, r *resty.Request, file io.Reader) {
 				r.SetQueryParam("test", "1")
+				r.SetFileReader("file", "test.txt", file)
 			}),
 		}...,
 	)

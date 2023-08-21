@@ -13,8 +13,9 @@ import (
 type httpFileStorage struct {
 	HttpClient *resty.Client
 	APIConfig
-	beforeSaveFile []func(*resty.Request)
-	beforeGetFile  []func(*resty.Request)
+	beforeSaveFile []func(*httpFileStorage, *resty.Request, io.Reader)
+	afterSaveFile  []func(*httpFileStorage, *resty.Response)
+	beforeGetFile  []func(*httpFileStorage, *resty.Request)
 }
 
 type APIConfig struct {
@@ -100,14 +101,21 @@ func SetTimeout(timeout time.Duration) HttpFileStorageOption {
 }
 
 // OnBeforeSaveFile 发送请求前可以做一些处理
-func OnBeforeSaveFile(f func(*resty.Request)) HttpFileStorageOption {
+func OnBeforeSaveFile(f func(*httpFileStorage, *resty.Request, io.Reader)) HttpFileStorageOption {
 	return func(s *httpFileStorage) {
 		s.beforeSaveFile = append(s.beforeSaveFile, f)
 	}
 }
 
+// OnAfterSaveFile 发送请求后可以做一些处理
+func OnAfterSaveFile(f func(*httpFileStorage, *resty.Response)) HttpFileStorageOption {
+	return func(s *httpFileStorage) {
+		s.afterSaveFile = append(s.afterSaveFile, f)
+	}
+}
+
 // OnBeforeGetFile 发送请求前可以做一些处理
-func OnBeforeGetFile(f func(*resty.Request)) HttpFileStorageOption {
+func OnBeforeGetFile(f func(*httpFileStorage, *resty.Request)) HttpFileStorageOption {
 	return func(s *httpFileStorage) {
 		s.beforeGetFile = append(s.beforeGetFile, f)
 	}
@@ -138,7 +146,7 @@ func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) error {
 	uploadURL := path.Join(s.UploadAPI, filePath)
 	req := s.HttpClient.R().SetBody(file)
 	for _, h := range s.beforeSaveFile {
-		h(req)
+		h(s, req, file)
 	}
 	resp, err := req.Post(uploadURL)
 	if err != nil {
@@ -146,6 +154,10 @@ func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) error {
 	}
 	if resp.StatusCode() != http.StatusOK {
 		return errors.New("failed to save file")
+	}
+
+	for _, h := range s.afterSaveFile {
+		h(s, resp)
 	}
 	return nil
 }
@@ -155,7 +167,7 @@ func (s *httpFileStorage) GetFile(filePath string) (io.ReadCloser, error) {
 	downloadURL := path.Join(s.DownloadAPI, filePath)
 	req := s.HttpClient.R().SetDoNotParseResponse(true)
 	for _, h := range s.beforeGetFile {
-		h(req)
+		h(s, req)
 	}
 	resp, err := req.Get(downloadURL)
 	if err != nil {
