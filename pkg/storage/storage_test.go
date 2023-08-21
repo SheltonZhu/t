@@ -115,11 +115,11 @@ func TestHttpFileStorage(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		if r.Method != "GET" {
 			assert.Equal(t, "/upload/test.txt", r.URL.Path)
-			w.Write([]byte("This is a test file."))
+			_, _ = w.Write([]byte("This is a test file."))
 			return
 		}
 		assert.Equal(t, "/download/test.txt", r.URL.Path)
-		w.Write([]byte("This is a test file."))
+		_, _ = w.Write([]byte("This is a test file."))
 	}))
 	defer ts.Close()
 

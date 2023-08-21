@@ -23,12 +23,6 @@ func (r *RandSaltGen) GetRandSalt() string {
 	return sEnc[:len(sEnc)-2]
 }
 
-type md5Encryptor struct {
-	RandomSaltGenerator
-	constSalt string
-	randSalt  string
-}
-
 // MD5Option 选项配置
 type MD5Option func(*md5Encryptor)
 
@@ -43,6 +37,12 @@ func WithConstSalt(salt string) MD5Option {
 	return func(e *md5Encryptor) {
 		e.constSalt = salt
 	}
+}
+
+type md5Encryptor struct {
+	RandomSaltGenerator
+	constSalt string
+	randSalt  string
 }
 
 // NewMD5Encryptor

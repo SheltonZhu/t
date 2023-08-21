@@ -4,10 +4,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type bcryptEncryptor struct {
-	Cost int
-}
-
 // BcryptOption 选项配置
 type BcryptOption func(*bcryptEncryptor)
 
@@ -16,6 +12,10 @@ func WithCost(cost int) BcryptOption {
 	return func(be *bcryptEncryptor) {
 		be.Cost = cost
 	}
+}
+
+type bcryptEncryptor struct {
+	Cost int
 }
 
 // NewBcryptEncryptor

@@ -2,18 +2,19 @@ package encryption
 
 import (
 	"fmt"
-	"github.com/tvdburgt/go-argon2"
 	"strings"
+
+	"github.com/tvdburgt/go-argon2"
 )
+
+// Argon2Option 选项配置
+type Argon2Option func(*argon2Encryptor)
 
 type argon2Encryptor struct {
 	RandomSaltGenerator
 	Ctx      *argon2.Context
 	randSalt string
 }
-
-// Argon2Option 选项配置
-type Argon2Option func(*argon2Encryptor)
 
 // NewArgon2Encryptor
 func NewArgon2Encryptor(opts ...Argon2Option) *argon2Encryptor {

@@ -68,7 +68,9 @@ func (fs *FileStorage) SaveFileBytes(fileBytes []byte, filePath string) error {
 // GetFileBytes 获取保存文件bytes
 func (fs *FileStorage) GetFileBytes(filePath string) ([]byte, error) {
 	readCloser, err := fs.GetFile(filePath)
-	defer readCloser.Close()
+	defer func() {
+		_ = readCloser.Close()
+	}()
 	if err != nil {
 		return nil, err
 	}
