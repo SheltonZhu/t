@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"path"
+	"net/url"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -143,7 +143,10 @@ func NewHttpFileGetSaveCleaner(apiConfig APIConfig, opts ...HttpFileStorageOptio
 
 // SaveFile 实现了 FileSaver 接口的 SaveFile 方法
 func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) error {
-	uploadURL := path.Join(s.UploadAPI, filePath)
+	uploadURL, err := url.JoinPath(s.UploadAPI, filePath)
+	if err != nil {
+		return err
+	}
 	req := s.HttpClient.R().SetBody(file)
 	for _, h := range s.beforeSaveFile {
 		h(s, req, file)
@@ -153,7 +156,7 @@ func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) error {
 		return err
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return errors.New("failed to save file")
+		return errors.New("failed to save file, response is not 200")
 	}
 
 	for _, h := range s.afterSaveFile {
@@ -164,7 +167,10 @@ func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) error {
 
 // GetFile 实现了 FileGetter 接口的 GetFile 方法
 func (s *httpFileStorage) GetFile(filePath string) (io.ReadCloser, error) {
-	downloadURL := path.Join(s.DownloadAPI, filePath)
+	downloadURL, err := url.JoinPath(s.DownloadAPI, filePath)
+	if err != nil {
+		return nil, err
+	}
 	req := s.HttpClient.R().SetDoNotParseResponse(true)
 	for _, h := range s.beforeGetFile {
 		h(s, req)
@@ -174,7 +180,7 @@ func (s *httpFileStorage) GetFile(filePath string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return nil, errors.New("failed to get file")
+		return nil, errors.New("failed to get file, response is not 200")
 	}
 
 	return resp.RawBody(), nil
