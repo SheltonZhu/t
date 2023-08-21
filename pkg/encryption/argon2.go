@@ -40,6 +40,9 @@ func NewArgon2Encryptor(opts ...Argon2Option) *argon2Encryptor {
 func (e *argon2Encryptor) Encode(plainPwd string) (string, error) {
 	if e.randSalt == "" {
 		e.randSalt = e.GetRandSalt()
+		defer func() {
+			e.randSalt = ""
+		}()
 	}
 	hash, err := argon2.HashEncoded(e.Ctx, []byte(plainPwd), []byte(e.randSalt))
 	if err != nil {
@@ -56,11 +59,13 @@ func (e *argon2Encryptor) Verify(hashedPwd string, plainPwd string) bool {
 		return false
 	}
 	e.randSalt = pairs[len(pairs)-1]
+	defer func() {
+		e.randSalt = ""
+	}()
 	hash, err := e.Encode(plainPwd)
 	if err != nil {
 		return false
 	}
-	e.randSalt = ""
 	return hash == hashedPwd
 }
 

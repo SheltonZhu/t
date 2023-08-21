@@ -60,6 +60,9 @@ func NewMD5Encryptor(opts ...MD5Option) *md5Encryptor {
 func (e *md5Encryptor) Encode(plainPwd string) (string, error) {
 	if e.randSalt == "" {
 		e.randSalt = e.GetRandSalt()
+		defer func() {
+			e.randSalt = ""
+		}()
 	}
 	hashBytes := md5.Sum([]byte(plainPwd + e.constSalt + e.randSalt))
 	hash := hex.EncodeToString(hashBytes[:])
@@ -74,11 +77,13 @@ func (e *md5Encryptor) Verify(hashedPwd string, plainPwd string) bool {
 		return false
 	}
 	e.randSalt = pairs[2]
+	defer func() {
+		e.randSalt = ""
+	}()
 	hash, err := e.Encode(plainPwd)
 	if err != nil {
 		return false
 	}
-	e.randSalt = ""
 	return hash == hashedPwd
 }
 
