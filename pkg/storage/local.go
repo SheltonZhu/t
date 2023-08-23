@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"github.com/pkg/errors"
 	"path/filepath"
 )
 
@@ -29,26 +30,26 @@ func isDirExists(dirPath string) bool {
 }
 
 // SaveFile 实现了 FileSaver 接口的 SaveFile 方法
-func (s *localDiskFileStorage) SaveFile(file io.Reader, filePath string) error {
+func (s *localDiskFileStorage) SaveFile(file io.Reader, filePath string) (string, error) {
 	filePath = filepath.Join(s.basePath, filePath)
 	fileDir := path.Dir(filePath)
 	if !isDirExists(fileDir) {
 		if err := os.MkdirAll(fileDir, 0755); err != nil {
-			return err
+			return "", errors.Wrap(err, "failed to save file")
 		}
 	}
 	outputFile, err := os.Create(filePath)
 	if err != nil {
-		return err
+		return "", errors.Wrap(err, "failed to save file")
 	}
 	defer outputFile.Close()
 
 	_, err = io.Copy(outputFile, file)
 	if err != nil {
-		return err
+		return "", errors.Wrap(err, "failed to save file") 
 	}
 
-	return nil
+	return filePath, nil
 }
 
 // GetFile 实现了 FileGetter 接口的 GetFile 方法
@@ -56,7 +57,7 @@ func (s *localDiskFileStorage) GetFile(filePath string) (io.ReadCloser, error) {
 	filePath = filepath.Join(s.basePath, filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get file")
 	}
 
 	return file, nil
@@ -67,7 +68,7 @@ func (s *localDiskFileStorage) CleanFile(filePath string) error {
 	filePath = filepath.Join(s.basePath, filePath)
 	err := os.Remove(filePath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to clean file")
 	}
 	return nil
 }

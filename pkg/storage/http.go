@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,7 +14,7 @@ type httpFileStorage struct {
 	HttpClient *resty.Client
 	APIConfig
 	beforeSaveFile []func(*httpFileStorage, *resty.Request, io.Reader)
-	afterSaveFile  []func(*httpFileStorage, *resty.Response)
+	afterSaveFile  []func(*httpFileStorage, *resty.Response, *string)
 	beforeGetFile  []func(*httpFileStorage, *resty.Request)
 }
 
@@ -108,7 +108,7 @@ func OnBeforeSaveFile(f func(*httpFileStorage, *resty.Request, io.Reader)) HttpF
 }
 
 // OnAfterSaveFile 发送请求后可以做一些处理
-func OnAfterSaveFile(f func(*httpFileStorage, *resty.Response)) HttpFileStorageOption {
+func OnAfterSaveFile(f func(*httpFileStorage, *resty.Response, *string)) HttpFileStorageOption {
 	return func(s *httpFileStorage) {
 		s.afterSaveFile = append(s.afterSaveFile, f)
 	}
@@ -142,10 +142,10 @@ func NewHttpFileGetSaveCleaner(apiConfig APIConfig, opts ...HttpFileStorageOptio
 }
 
 // SaveFile 实现了 FileSaver 接口的 SaveFile 方法
-func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) error {
+func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) (string, error) {
 	uploadURL, err := url.JoinPath(s.UploadAPI, filePath)
 	if err != nil {
-		return err
+		return "", errors.Wrap(err, "failed to save file")
 	}
 	req := s.HttpClient.R().SetBody(file)
 	for _, h := range s.beforeSaveFile {
@@ -153,23 +153,23 @@ func (s *httpFileStorage) SaveFile(file io.Reader, filePath string) error {
 	}
 	resp, err := req.Post(uploadURL)
 	if err != nil {
-		return err
+		return "", errors.Wrap(err, "failed to save file")
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return errors.New("failed to save file, response is not 200")
+		return "", errors.New("failed to save file")
 	}
 
 	for _, h := range s.afterSaveFile {
-		h(s, resp)
+		h(s, resp, &filePath)
 	}
-	return nil
+	return filePath, nil
 }
 
 // GetFile 实现了 FileGetter 接口的 GetFile 方法
 func (s *httpFileStorage) GetFile(filePath string) (io.ReadCloser, error) {
 	downloadURL, err := url.JoinPath(s.DownloadAPI, filePath)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get file")
 	}
 	req := s.HttpClient.R().SetDoNotParseResponse(true)
 	for _, h := range s.beforeGetFile {
@@ -177,7 +177,7 @@ func (s *httpFileStorage) GetFile(filePath string) (io.ReadCloser, error) {
 	}
 	resp, err := req.Get(downloadURL)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get file")
 	}
 	if resp.StatusCode() != http.StatusOK {
 		return nil, errors.New("failed to get file, response is not 200")

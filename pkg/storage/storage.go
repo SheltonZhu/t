@@ -10,7 +10,7 @@ import (
 )
 
 type FileSaver interface {
-	SaveFile(file io.Reader, filePath string) error
+	SaveFile(file io.Reader, filePath string) (string, error)
 }
 
 type FileGetter interface {
@@ -32,21 +32,23 @@ type FileGetSaveCleaner interface {
 }
 
 type fileStorageBytesHandler interface {
-	SaveFileBytes(fileBytes []byte, filePath string) error
+	SaveFileBytes(fileBytes []byte, filePath string) (string, error)
 	GetFileBytes(filePath string) ([]byte, error)
 }
 
 type batchHandler interface {
-	BatchSaveFiles(files map[string]io.Reader) []error
+	BatchSaveFiles(files map[string]io.Reader) (map[string]string, []error)
 	BatchGetFiles(filePaths []string) ([]io.ReadCloser, []error)
 	BatchCleanFiles(filePaths []string) []error
-	ConcurrentBatchSaveFiles(files map[string]io.Reader) error
+	ConcurrentBatchSaveFiles(files map[string]io.Reader) (map[string]string, error)
 	ConcurrentBatchGetFiles(filePaths []string) ([]io.ReadCloser, error)
 	ConcurrentBatchCleanFiles(filePaths []string) error
 }
 
 // FileStorage 定义文件仓储接口
 // 实现一个新的存储只需要实现FileGetSaveCleaner接口
+//
+//go:generate mockgen -source=storage.go -destination=../mocks/storage/mock_storage.go -package=mock_storage
 type IFileStorage interface {
 	FileGetSaveCleaner
 	fileStorageBytesHandler
@@ -60,9 +62,14 @@ type FileStorage struct {
 }
 
 // SaveFileBytes 通过传入bytes保存文件
-func (fs *FileStorage) SaveFileBytes(fileBytes []byte, filePath string) error {
+func (fs *FileStorage) SaveFileBytes(fileBytes []byte, filePath string) (string, error) {
 	reader := bytes.NewReader(fileBytes)
-	return fs.SaveFile(reader, filePath)
+	filePath, err := fs.SaveFile(reader, filePath)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to save file bytes")
+	}
+
+	return filePath, nil
 }
 
 // GetFileBytes 获取保存文件bytes
@@ -72,11 +79,11 @@ func (fs *FileStorage) GetFileBytes(filePath string) ([]byte, error) {
 		_ = readCloser.Close()
 	}()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get file bytes")
 	}
 	fileBytes, err := io.ReadAll(readCloser)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get file bytes")
 	}
 	for _, h := range fs.afterResponse {
 		h(fs, &fileBytes)
@@ -85,14 +92,20 @@ func (fs *FileStorage) GetFileBytes(filePath string) ([]byte, error) {
 }
 
 // BatchSaveFiles 批量保存文件
-func (fs *FileStorage) BatchSaveFiles(files map[string]io.Reader) []error {
+func (fs *FileStorage) BatchSaveFiles(files map[string]io.Reader) (map[string]string, []error) {
 	errs := make([]error, 0)
+	filePaths := make(map[string]string, len(files))
 	for filePath, file := range files {
-		if err := fs.SaveFile(file, filePath); err != nil {
+		var (
+			fp  string
+			err error
+		)
+		if fp, err = fs.SaveFile(file, filePath); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to save file, path: %s", filePath))
 		}
+		filePaths[filePath] = fp
 	}
-	return errs
+	return filePaths, errs
 }
 
 // BatchGetFiles 批量获取文件
@@ -133,20 +146,23 @@ func (fs *FileStorage) SetConcurrencyLimit(limit uint) *FileStorage {
 }
 
 // ConcurrentBatchSaveFiles 批量并发保存文件
-func (fs *FileStorage) ConcurrentBatchSaveFiles(files map[string]io.Reader) error {
+func (fs *FileStorage) ConcurrentBatchSaveFiles(files map[string]io.Reader) (map[string]string, error) {
 	g := &errgroup.Group{}
 	g.GOMAXPROCS(int(fs.ConcurrencyLimit))
 
+	filePaths := make(map[string]string, len(files))
 	for filePath, file := range files {
 		filePath, file := filePath, file
 		g.Go(func(ctx context.Context) error {
-			if err := fs.SaveFile(file, filePath); err != nil {
-				return errors.Wrapf(err, "failed to save file, path: %s", filePath)
+			fp, err := fs.SaveFile(file, filePath)
+			filePaths[filePath] = fp
+			if err != nil {
+				return errors.Wrapf(err, "failed to concurrent save file, path: %s", filePath)
 			}
 			return nil
 		})
 	}
-	return g.Wait()
+	return filePaths, g.Wait()
 }
 
 // ConcurrentBatchGetFiles 批量并发获取文件
@@ -159,7 +175,7 @@ func (fs *FileStorage) ConcurrentBatchGetFiles(filePaths []string) ([]io.ReadClo
 		g.Go(func(ctx context.Context) error {
 			fileReadCloser, err := fs.GetFile(filePath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get file, path: %s", filePath)
+				return errors.Wrapf(err, "failed to con current get file, path: %s", filePath)
 			}
 			fileReadClosers[idx] = fileReadCloser
 			return nil
@@ -180,7 +196,7 @@ func (fs *FileStorage) ConcurrentBatchCleanFiles(filePaths []string) error {
 		filePath := filePath // https://golang.org/doc/faq#closures_and_goroutines
 		g.Go(func(ctx context.Context) error {
 			if err := fs.CleanFile(filePath); err != nil {
-				return errors.Wrapf(err, "failed to clean file, path: %s", filePath)
+				return errors.Wrapf(err, "failed to concurrent clean file, path: %s", filePath)
 			}
 			return nil
 		})
