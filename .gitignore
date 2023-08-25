@@ -41,3 +41,6 @@ go.work
 
 # Go workspace file
 go.work
+
+# coverage.html
+coverage.html
