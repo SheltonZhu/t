@@ -64,9 +64,14 @@ func (e *md5Encryptor) Encode(plainPwd string) (string, error) {
 			e.randSalt = ""
 		}()
 	}
-	hashBytes := md5.Sum([]byte(plainPwd + e.constSalt + e.randSalt))
-	hash := hex.EncodeToString(hashBytes[:])
+	data := []byte(plainPwd + e.constSalt + e.randSalt)
+	h := md5.New()
+	if _, err := h.Write(data); err != nil {
+		return "", err
+	}
+	hash := hex.EncodeToString(h.Sum(nil))
 	return fmt.Sprintf("$md5$%s$%s", e.randSalt, hash), nil
+
 }
 
 // Verify 实现了 Encryptor 接口的 Verify 方法
