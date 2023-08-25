@@ -9,10 +9,11 @@ import (
 	"testing"
 	"time"
 
+	mock_storage "t/mocks/storage"
+
 	"github.com/go-resty/resty/v2"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"t/mocks/storage"
 )
 
 func TestLocalDiskFileStorage(t *testing.T) {
@@ -81,7 +82,7 @@ func TestHttpFileStorage(t *testing.T) {
 			SetTimeout(time.Second),
 			WithHttpTrace(),
 			WithHttpBasicAuth("user", "user"),
-			SetDebug(),
+			SetDebug(1000),
 			SetHttps(),
 			OnBeforeGetFile(func(s *httpFileStorage, r *resty.Request) {
 				r.SetQueryParam("test", "1")
@@ -176,7 +177,9 @@ func TestConcurrentBatchFileStorage(t *testing.T) {
 		CleanFile(gomock.Any()).
 		Return(nil).AnyTimes()
 
-	storage := NewFileStorage(mockFileGetSaveCleaner)
+	storage := NewFileStorage(mockFileGetSaveCleaner, func(fs *FileStorage) {
+		fs.SetConcurrencyLimit(10)
+	})
 	storage.SetConcurrencyLimit(10)
 	// 批量并发保存文件
 	batchFiles := map[string]io.Reader{

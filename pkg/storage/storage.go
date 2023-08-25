@@ -48,7 +48,7 @@ type batchHandler interface {
 // FileStorage 定义文件仓储接口
 // 实现一个新的存储只需要实现FileGetSaveCleaner接口
 //
-//go:generate mockgen -source=storage.go -destination=../mocks/storage/mock_storage.go -package=mock_storage
+//go:generate mockgen -source=storage.go -destination=../../mocks/storage/mock_storage.go -package=mock_storage
 type IFileStorage interface {
 	FileGetSaveCleaner
 	fileStorageBytesHandler
