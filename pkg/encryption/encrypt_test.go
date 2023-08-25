@@ -52,7 +52,7 @@ func TestNoneEncryptor(t *testing.T) {
 }
 
 func TestMD5Encryptor(t *testing.T) {
-	md5Encryptor := NewMD5Encryptor(WithConstSalt("&^@*("))
+	md5Encryptor := NewMD5Encryptor(WithConstSalt("&^@*("), WithRandSaltGen(&RandSaltGen{}))
 
 	t.Run("Encode and Verify", func(t *testing.T) {
 		plainPwd := "password123"
@@ -77,7 +77,7 @@ func TestMD5Encryptor(t *testing.T) {
 }
 
 func TestArgon2Encryptor(t *testing.T) {
-	argon2Encryptor := NewArgon2Encryptor()
+	argon2Encryptor := NewArgon2Encryptor(func(ae *argon2Encryptor) {})
 
 	t.Run("Encode and Verify", func(t *testing.T) {
 		plainPwd := "password123"
