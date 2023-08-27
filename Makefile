@@ -23,7 +23,7 @@ init:
 ## test: 测试
 .PHONY: test
 test:
-	go test -coverpkg=./pkg/... -coverprofile=./coverage.out ./...
+	go test -coverpkg=./pkg/... -coverprofile=./coverage.out ./pkg/...
 	go tool cover -html=./coverage.out -o coverage.html
 
 ## gen-mock: 使用 mockgen 生成接口 mock文件

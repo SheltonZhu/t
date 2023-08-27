@@ -29,6 +29,13 @@ func TestBcryptEncryptor(t *testing.T) {
 		ok := bcryptEncryptor.Verify(hashedPwd, "wrongpassword")
 		assert.False(t, ok)
 	})
+
+	t.Run("Encode with wrong cost", func(t *testing.T) {
+		bcryptEncryptor.Cost = 10000000000000
+		plainPwd := "password123"
+		_, err := bcryptEncryptor.Encode(plainPwd)
+		assert.Error(t, err)
+	})
 }
 
 func TestNoneEncryptor(t *testing.T) {

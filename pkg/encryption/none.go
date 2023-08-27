@@ -14,10 +14,7 @@ func (e *noneEncryptor) Encode(plainPwd string) (string, error) {
 
 // Verify 实现了 Encryptor 接口的 Verify 方法
 func (e *noneEncryptor) Verify(hashedPwd string, plainPwd string) bool {
-	hash, err := e.Encode(plainPwd)
-	if err != nil {
-		return false
-	}
+	hash, _ := e.Encode(plainPwd)
 	return hash == hashedPwd
 }
 
