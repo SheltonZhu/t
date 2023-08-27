@@ -53,6 +53,20 @@ func TestLocalDiskFileStorage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestLocalDiskFileStorageErr(t *testing.T) {
+	// 创建本地磁盘存储实例
+	storage := NewLocalDiskFileStorage("not_exists")
+
+	f := isDirExists("not_exists")
+	assert.False(t, f)
+	
+	_, err := storage.GetFile("not_exists")
+	assert.Error(t, err, "Failed to read file content")
+
+	err = storage.CleanFile("not_exists")
+	assert.Error(t, err)
+}
+
 func TestHttpFileStorage(t *testing.T) {
 	// mock 实现
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -118,61 +132,67 @@ func TestHttpFileStorageErr(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	// 响应不为200
-	// 创建http存储实例
-	storage := NewHttpFileStorage(
-		APIConfig{
-			Host:        "example.com",
-			UploadAPI:   "/upload",
-			DownloadAPI: "/download",
-		},
-		SetBaseURL(ts.URL),
-		SetTimeout(time.Second),
-		SetHttps(),
-	)
+	t.Run("Response is not 200", func(t *testing.T) {
+		// 响应不为200
+		// 创建http存储实例
+		storage := NewHttpFileStorage(
+			APIConfig{
+				Host:        "example.com",
+				UploadAPI:   "/upload",
+				DownloadAPI: "/download",
+			},
+			SetBaseURL(ts.URL),
+			SetTimeout(time.Second),
+			SetHttps(),
+		)
 
-	_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
-	assert.Error(t, err, "Failed to save file")
+		_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
+		assert.Error(t, err, "Failed to save file")
 
-	_, err = storage.GetFileBytes("test.txt")
-	assert.Error(t, err, "Failed to save file")
+		_, err = storage.GetFileBytes("test.txt")
+		assert.Error(t, err, "Failed to save file")
+	})
 
-	// 服务器返回错误
-	// 创建http存储实例
-	storage = NewHttpFileStorage(
-		APIConfig{
-			Host:        "!@#!@$!@!@%@!%",
-			UploadAPI:   "/upload",
-			DownloadAPI: "/download",
-		},
-		SetTimeout(time.Second),
-		SetHttps(),
-	)
+	t.Run("Response error", func(t *testing.T) {
+		// 服务器返回错误
+		// 创建http存储实例
+		storage := NewHttpFileStorage(
+			APIConfig{
+				Host:        "!@#!@$!@!@%@!%",
+				UploadAPI:   "/upload",
+				DownloadAPI: "/download",
+			},
+			SetTimeout(time.Second),
+			SetHttps(),
+		)
 
-	_, err = storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
-	assert.Error(t, err, "Failed to save file")
+		_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
+		assert.Error(t, err, "Failed to save file")
 
-	_, err = storage.GetFileBytes("test.txt")
-	assert.Error(t, err, "Failed to save file")
+		_, err = storage.GetFileBytes("test.txt")
+		assert.Error(t, err, "Failed to save file")
+	})
 
-	// API 解析错误
-	// 创建http存储实例
-	storage = NewHttpFileStorage(
-		APIConfig{
-			Host:        "example.com",
-			UploadAPI:   "!@$!@%!@!5",
-			DownloadAPI: "!$!@$!%@%!@%!@%!",
-		},
-		SetBaseURL(ts.URL),
-		SetTimeout(time.Second),
-		SetHttps(),
-	)
+	t.Run("Request api parse error", func(t *testing.T) {
+		// API 解析错误
+		// 创建http存储实例
+		storage := NewHttpFileStorage(
+			APIConfig{
+				Host:        "example.com",
+				UploadAPI:   "!@$!@%!@!5",
+				DownloadAPI: "!$!@$!%@%!@%!@%!",
+			},
+			SetBaseURL(ts.URL),
+			SetTimeout(time.Second),
+			SetHttps(),
+		)
 
-	_, err = storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
-	assert.Error(t, err, "Failed to save file")
+		_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
+		assert.Error(t, err, "Failed to save file")
 
-	_, err = storage.GetFileBytes("test.txt")
-	assert.Error(t, err, "Failed to save file")
+		_, err = storage.GetFileBytes("test.txt")
+		assert.Error(t, err, "Failed to save file")
+	})
 }
 
 func TestFileStorageErr(t *testing.T) {
@@ -193,48 +213,55 @@ func TestFileStorageErr(t *testing.T) {
 
 	storage := NewFileStorage(mockFileGetSaveCleaner)
 
-	// 保存文件
-	fileContent := []byte("This is a test file.")
-	fileName := "test.txt"
-	_, err := storage.SaveFileBytes(fileContent, fileName)
-	assert.Error(t, err, "Failed to save file")
+	t.Run("Operate file bytes error", func(t *testing.T) {
+		// 保存文件
+		fileContent := []byte("This is a test file.")
+		fileName := "test.txt"
+		_, err := storage.SaveFileBytes(fileContent, fileName)
+		assert.Error(t, err, "Failed to save file")
 
-	// 获取文件
-	_, err = storage.GetFileBytes(fileName)
-	assert.Error(t, err, "Failed to read file content")
+		// 获取文件
+		_, err = storage.GetFileBytes(fileName)
+		assert.Error(t, err, "Failed to read file content")
 
-	// 清理文件
-	err = storage.CleanFile(fileName)
-	assert.Error(t, err)
+		// 清理文件
+		err = storage.CleanFile(fileName)
+		assert.Error(t, err)
+	})
 
-	// 批量保存文件
 	batchFiles := map[string]io.Reader{
 		"file1.txt": bytes.NewReader([]byte("File 1 content")),
 		"file2.txt": bytes.NewReader([]byte("File 2 content")),
 	}
-	_, errs := storage.BatchSaveFiles(batchFiles)
-	assert.NotZero(t, len(errs), "Failed to batch save files")
-
-	// 批量获取文件
 	batchFilenames := []string{"file1.txt", "file2.txt"}
-	_, errs = storage.BatchGetFiles(batchFilenames)
-	assert.NotZero(t, len(errs), "Failed to batch get files")
 
-	// 批量清理
-	errs = storage.BatchCleanFiles(batchFilenames)
-	assert.NotZero(t, len(errs), "Failed to batch clean files")
+	t.Run("batch operate file reader error", func(t *testing.T) {
+		// 批量保存文件
+		_, errs := storage.BatchSaveFiles(batchFiles)
+		assert.NotZero(t, len(errs), "Failed to batch save files")
 
-	// 批量并发保存文件
-	_, err = storage.ConcurrentBatchSaveFiles(batchFiles)
-	assert.Error(t, err, "Failed to concurrent batch save files")
+		// 批量获取文件
+		_, errs = storage.BatchGetFiles(batchFilenames)
+		assert.NotZero(t, len(errs), "Failed to batch get files")
 
-	// 批量并发保存文件
-	_, err = storage.ConcurrentBatchGetFiles(batchFilenames)
-	assert.Error(t, err, "Failed to concurrent batch save files")
+		// 批量清理
+		errs = storage.BatchCleanFiles(batchFilenames)
+		assert.NotZero(t, len(errs), "Failed to batch clean files")
+	})
 
-	// 批量并发清理文件
-	err = storage.ConcurrentBatchCleanFiles(batchFilenames)
-	assert.Error(t, err, "Failed to concurrent batch clean files")
+	t.Run("Concurrent batch operate file reader error", func(t *testing.T) {
+		// 批量并发保存文件
+		_, err := storage.ConcurrentBatchSaveFiles(batchFiles)
+		assert.Error(t, err, "Failed to concurrent batch save files")
+
+		// 批量并发保存文件
+		_, err = storage.ConcurrentBatchGetFiles(batchFilenames)
+		assert.Error(t, err, "Failed to concurrent batch save files")
+
+		// 批量并发清理文件
+		err = storage.ConcurrentBatchCleanFiles(batchFilenames)
+		assert.Error(t, err, "Failed to concurrent batch clean files")
+	})
 }
 
 func TestBatchFileStorage(t *testing.T) {
