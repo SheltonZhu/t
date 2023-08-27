@@ -75,26 +75,24 @@ func TestHttpFileStorage(t *testing.T) {
 			UploadAPI:   "/upload",
 			DownloadAPI: "/download",
 		},
-		[]HttpFileStorageOption{
-			WithHttpClient(http.DefaultClient),
-			SetBaseURL(ts.URL),
-			WithHttpHeaderHost("test.com"),
-			SetTimeout(time.Second),
-			WithHttpTrace(),
-			WithHttpBasicAuth("user", "user"),
-			SetDebug(1000),
-			SetHttps(),
-			OnBeforeGetFile(func(s *httpFileStorage, r *resty.Request) {
-				r.SetQueryParam("test", "1")
-			}),
-			OnAfterSaveFile(func(hfs *httpFileStorage, r *resty.Response, filePath *string) {
-				assert.Equal(t, r.Body(), []byte("This is a test file."))
-			}),
-			OnBeforeSaveFile(func(s *httpFileStorage, r *resty.Request, file io.Reader) {
-				r.SetQueryParam("test", "1")
-				r.SetFileReader("file", "test.txt", file)
-			}),
-		}...,
+		WithHttpClient(http.DefaultClient),
+		SetBaseURL(ts.URL),
+		WithHttpHeaderHost("test.com"),
+		SetTimeout(time.Second),
+		WithHttpTrace(),
+		WithHttpBasicAuth("user", "user"),
+		SetDebug(1000),
+		SetHttps(),
+		OnBeforeGetFile(func(s *httpFileStorage, r *resty.Request) {
+			r.SetQueryParam("test", "1")
+		}),
+		OnAfterSaveFile(func(hfs *httpFileStorage, r *resty.Response, filePath *string) {
+			assert.Equal(t, r.Body(), []byte("This is a test file."))
+		}),
+		OnBeforeSaveFile(func(s *httpFileStorage, r *resty.Request, file io.Reader) {
+			r.SetQueryParam("test", "1")
+			r.SetFileReader("file", "test.txt", file)
+		}),
 	)
 	// 保存文件
 	fileContent := []byte("This is a test file.")
@@ -106,6 +104,137 @@ func TestHttpFileStorage(t *testing.T) {
 	retrievedContent, err := storage.GetFileBytes(fileName)
 	assert.NoError(t, err, "Failed to read file content", retrievedContent)
 	assert.Equal(t, fileContent, retrievedContent, "Retrieved file content does not match")
+
+	// 清理文件
+	err = storage.CleanFile(fileName)
+	assert.NoError(t, err)
+}
+
+func TestHttpFileStorageErr(t *testing.T) {
+	// mock 实现
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 这里构造 mock 的具体处理细节
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	// 响应不为200
+	// 创建http存储实例
+	storage := NewHttpFileStorage(
+		APIConfig{
+			Host:        "example.com",
+			UploadAPI:   "/upload",
+			DownloadAPI: "/download",
+		},
+		SetBaseURL(ts.URL),
+		SetTimeout(time.Second),
+		SetHttps(),
+	)
+
+	_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
+	assert.Error(t, err, "Failed to save file")
+
+	_, err = storage.GetFileBytes("test.txt")
+	assert.Error(t, err, "Failed to save file")
+
+	// 服务器返回错误
+	// 创建http存储实例
+	storage = NewHttpFileStorage(
+		APIConfig{
+			Host:        "!@#!@$!@!@%@!%",
+			UploadAPI:   "/upload",
+			DownloadAPI: "/download",
+		},
+		SetTimeout(time.Second),
+		SetHttps(),
+	)
+
+	_, err = storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
+	assert.Error(t, err, "Failed to save file")
+
+	_, err = storage.GetFileBytes("test.txt")
+	assert.Error(t, err, "Failed to save file")
+
+	// API 解析错误
+	// 创建http存储实例
+	storage = NewHttpFileStorage(
+		APIConfig{
+			Host:        "example.com",
+			UploadAPI:   "!@$!@%!@!5",
+			DownloadAPI: "!$!@$!%@%!@%!@%!",
+		},
+		SetBaseURL(ts.URL),
+		SetTimeout(time.Second),
+		SetHttps(),
+	)
+
+	_, err = storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
+	assert.Error(t, err, "Failed to save file")
+
+	_, err = storage.GetFileBytes("test.txt")
+	assert.Error(t, err, "Failed to save file")
+}
+
+func TestFileStorageErr(t *testing.T) {
+	// 创建内存存储实例
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockFileGetSaveCleaner := mock_storage.NewMockFileGetSaveCleaner(ctrl)
+	mockFileGetSaveCleaner.EXPECT().
+		SaveFile(gomock.Any(), gomock.Any()).
+		Return("", assert.AnError).AnyTimes()
+	mockFileGetSaveCleaner.EXPECT().
+		GetFile(gomock.Any()).
+		Return(nil, assert.AnError).AnyTimes()
+	mockFileGetSaveCleaner.EXPECT().
+		CleanFile(gomock.Any()).
+		Return(assert.AnError).AnyTimes()
+
+	storage := NewFileStorage(mockFileGetSaveCleaner)
+
+	// 保存文件
+	fileContent := []byte("This is a test file.")
+	fileName := "test.txt"
+	_, err := storage.SaveFileBytes(fileContent, fileName)
+	assert.Error(t, err, "Failed to save file")
+
+	// 获取文件
+	_, err = storage.GetFileBytes(fileName)
+	assert.Error(t, err, "Failed to read file content")
+
+	// 清理文件
+	err = storage.CleanFile(fileName)
+	assert.Error(t, err)
+
+	// 批量保存文件
+	batchFiles := map[string]io.Reader{
+		"file1.txt": bytes.NewReader([]byte("File 1 content")),
+		"file2.txt": bytes.NewReader([]byte("File 2 content")),
+	}
+	_, errs := storage.BatchSaveFiles(batchFiles)
+	assert.NotZero(t, len(errs), "Failed to batch save files")
+
+	// 批量获取文件
+	batchFilenames := []string{"file1.txt", "file2.txt"}
+	_, errs = storage.BatchGetFiles(batchFilenames)
+	assert.NotZero(t, len(errs), "Failed to batch get files")
+
+	// 批量清理
+	errs = storage.BatchCleanFiles(batchFilenames)
+	assert.NotZero(t, len(errs), "Failed to batch clean files")
+
+	// 批量并发保存文件
+	_, err = storage.ConcurrentBatchSaveFiles(batchFiles)
+	assert.Error(t, err, "Failed to concurrent batch save files")
+
+	// 批量并发保存文件
+	_, err = storage.ConcurrentBatchGetFiles(batchFilenames)
+	assert.Error(t, err, "Failed to concurrent batch save files")
+
+	// 批量并发清理文件
+	err = storage.ConcurrentBatchCleanFiles(batchFilenames)
+	assert.Error(t, err, "Failed to concurrent batch clean files")
 }
 
 func TestBatchFileStorage(t *testing.T) {

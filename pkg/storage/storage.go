@@ -75,12 +75,12 @@ func (fs *FileStorage) SaveFileBytes(fileBytes []byte, filePath string) (string,
 // GetFileBytes 获取保存文件bytes
 func (fs *FileStorage) GetFileBytes(filePath string) ([]byte, error) {
 	readCloser, err := fs.GetFile(filePath)
-	defer func() {
-		_ = readCloser.Close()
-	}()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get file bytes")
 	}
+	defer func() {
+		_ = readCloser.Close()
+	}()
 	fileBytes, err := io.ReadAll(readCloser)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get file bytes")
