@@ -19,15 +19,15 @@ func NewJob(opts ...JobOption) Job {
 }
 
 // RetryIntervalFunc 重试间隔函数
-type RetryIntervalFunc func(retryTimes uint, lastWaitDuration time.Duration) time.Duration
+type RetryIntervalFunc func(job *job, retryTimes uint, lastWaitDuration time.Duration) time.Duration
 
 type job struct {
 	ctx               context.Context
 	jobTimeout        time.Duration
-	jobFunc           func(context.Context) error
+	jobFunc           func(context.Context, *job, uint) error
 	keepAliveEnable   bool
 	keepAliveInterval time.Duration
-	keepAliveFunc     func(context.Context) error
+	keepAliveFunc     func(context.Context, *job) error
 	retryMaxTimes     uint
 	retryIntervalFunc RetryIntervalFunc
 }
@@ -35,18 +35,18 @@ type job struct {
 func newJob() *job {
 	return &job{
 		ctx: context.Background(),
-		jobFunc: func(ctx context.Context) error {
+		jobFunc: func(ctx context.Context, job *job, retryMaxTimes uint) error {
 			// do some job here
 			return nil
 		},
 		jobTimeout:        10 * time.Minute,
 		keepAliveInterval: 3 * time.Second,
-		keepAliveFunc: func(ctx context.Context) error {
+		keepAliveFunc: func(ctx context.Context, job *job) error {
 			// do something to keep alive
 			return nil
 		},
 		retryMaxTimes: 0,
-		retryIntervalFunc: func(rt uint, lwd time.Duration) time.Duration {
+		retryIntervalFunc: func(j *job, rt uint, lwd time.Duration) time.Duration {
 			return time.Duration(1<<rt) * time.Second
 		},
 	}
@@ -85,20 +85,20 @@ func (j *job) runJob(ctx context.Context, doneChan chan<- error) {
 
 	// 如果不需要重试，直接执行
 	if j.retryMaxTimes == 0 {
-		err = j.jobFunc(ctx)
+		err = j.jobFunc(ctx, j, 0)
 		return
 	}
 
-	var nextDelay = time.Duration(0)
+	nextDelay := time.Duration(0)
 	// 出错等待一阵子重试
 	for i := uint(0); i < j.retryMaxTimes; i++ {
-		err = j.jobFunc(ctx)
+		err = j.jobFunc(ctx, j, i)
 		if err == nil {
 			return
 		}
 
 		// 根据指数退避重试策略计算下一个重试间隔时间
-		nextDelay = j.retryIntervalFunc(i, nextDelay)
+		nextDelay = j.retryIntervalFunc(j, i, nextDelay)
 		select {
 		case <-time.After(nextDelay):
 			// 等待重试间隔时间后继续重试
@@ -128,7 +128,7 @@ func (j *job) keepAlive(ctx context.Context, keepAliveChan chan<- error) {
 			// 如果上下文被取消，则返回
 			return
 		case <-ticker.C:
-			if err := j.keepAliveFunc(ctx); err != nil {
+			if err := j.keepAliveFunc(ctx, j); err != nil {
 				keepAliveChan <- err
 			}
 		}

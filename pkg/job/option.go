@@ -22,7 +22,7 @@ func WithJobTimeout(timeout time.Duration) JobOption {
 }
 
 // WithJobFunc 设置job函数
-func WithJobFunc(jobFunc func(context.Context) error) JobOption {
+func WithJobFunc(jobFunc func(context.Context, *job, uint) error) JobOption {
 	return func(j *job) {
 		j.jobFunc = jobFunc
 	}
@@ -43,7 +43,7 @@ func WithKeepAliveEnable() JobOption {
 }
 
 // WithKeepAliveFunc 设置keep alive函数
-func WithKeepAliveFunc(keepAliveFunc func(context.Context) error) JobOption {
+func WithKeepAliveFunc(keepAliveFunc func(context.Context, *job) error) JobOption {
 	return func(j *job) {
 		j.keepAliveFunc = keepAliveFunc
 	}
@@ -57,7 +57,7 @@ func WithRetryMaxTimes(retryMaxTimes uint) JobOption {
 }
 
 // WithRetryIntervalFunc 设置重试间隔函数
-func WithRetryIntervalFunc(retryIntervalFunc func(uint, time.Duration) time.Duration) JobOption {
+func WithRetryIntervalFunc(retryIntervalFunc func(*job, uint, time.Duration) time.Duration) JobOption {
 	return func(j *job) {
 		j.retryIntervalFunc = retryIntervalFunc
 	}

@@ -24,7 +24,7 @@ func TestJobTimeout(t *testing.T) {
 		WithKeepAliveEnable(),
 		WithKeepAliveInterval(100*time.Millisecond),
 		WithJobFunc(
-			func(ctx context.Context) error {
+			func(context.Context, *job, uint) error {
 				return assert.AnError
 			}),
 	).Execute()
@@ -40,12 +40,12 @@ func TestKeepAliveError(t *testing.T) {
 		WithKeepAliveEnable(),
 		WithKeepAliveInterval(100*time.Millisecond),
 		WithJobFunc(
-			func(ctx context.Context) error {
+			func(context.Context, *job, uint) error {
 				time.Sleep(500 * time.Millisecond)
 				return nil
 			}),
 		WithKeepAliveFunc(
-			func(context.Context) error {
+			func(context.Context, *job) error {
 				return assert.AnError
 			}),
 	).Execute()
@@ -58,11 +58,11 @@ func TestRetryMaxTimes(t *testing.T) {
 		WithJobTimeout(timeout),
 		WithRetryMaxTimes(2),
 		WithJobFunc(
-			func(ctx context.Context) error {
+			func(context.Context, *job, uint) error {
 				time.Sleep(100 * time.Millisecond)
 				return assert.AnError
 			}),
-		WithRetryIntervalFunc(func(uint, time.Duration) time.Duration {
+		WithRetryIntervalFunc(func(*job, uint, time.Duration) time.Duration {
 			return 100 * time.Millisecond
 		}),
 	).Execute()
@@ -79,7 +79,7 @@ func TestExternalCancel(t *testing.T) {
 func TestJobFuncPaninc(t *testing.T) {
 	err := NewJob(
 		WithJobTimeout(10*time.Second),
-		WithJobFunc(func(ctx context.Context) error {
+		WithJobFunc(func(context.Context, *job, uint) error {
 			panic(assert.AnError)
 		}),
 	).Execute()
@@ -89,13 +89,13 @@ func TestJobFuncPaninc(t *testing.T) {
 func TestKeepAliveFuncPaninc(t *testing.T) {
 	err := NewJob(
 		WithJobTimeout(10*time.Second),
-		WithJobFunc(func(ctx context.Context) error {
+		WithJobFunc(func(context.Context, *job, uint) error {
 			time.Sleep(1 * time.Second)
 			return nil
 		}),
 		WithKeepAliveEnable(),
 		WithKeepAliveInterval(10*time.Millisecond),
-		WithKeepAliveFunc(func(ctx context.Context) error {
+		WithKeepAliveFunc(func(context.Context, *job) error {
 			panic(assert.AnError)
 		}),
 	).Execute()
@@ -105,11 +105,11 @@ func TestKeepAliveFuncPaninc(t *testing.T) {
 func TestRetryIntervalFuncPanic(t *testing.T) {
 	err := NewJob(
 		WithJobTimeout(10*time.Second),
-		WithJobFunc(func(ctx context.Context) error {
+		WithJobFunc(func(context.Context, *job, uint) error {
 			return assert.AnError
 		}),
 		WithRetryMaxTimes(4),
-		WithRetryIntervalFunc(func(rt uint, lwd time.Duration) time.Duration {
+		WithRetryIntervalFunc(func(*job, uint, time.Duration) time.Duration {
 			panic(assert.AnError)
 		}),
 	).Execute()
@@ -120,11 +120,11 @@ func TestRetryWaitTimeFunc(t *testing.T) {
 	t.SkipNow()
 	err := NewJob(
 		WithJobTimeout(100*time.Second),
-		WithJobFunc(func(ctx context.Context) error {
+		WithJobFunc(func(context.Context, *job, uint) error {
 			return assert.AnError
 		}),
 		WithRetryMaxTimes(4),
-		WithRetryIntervalFunc(func(rt uint, lwd time.Duration) time.Duration {
+		WithRetryIntervalFunc(func(j *job, rt uint, lwd time.Duration) time.Duration {
 			n := time.Duration(1<<rt) * time.Second
 			fmt.Printf("重试: %d, 上次等待时间: %v, 下次等待时间: %v\n", rt, lwd, n)
 			return n
