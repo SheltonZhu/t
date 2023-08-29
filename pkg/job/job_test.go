@@ -10,6 +10,7 @@ import (
 )
 
 func TestJobDone(t *testing.T) {
+	t.Parallel()
 	err := NewJob(
 		WithJobTimeout(10 * time.Second),
 	).Execute()
@@ -17,6 +18,7 @@ func TestJobDone(t *testing.T) {
 }
 
 func TestJobTimeout(t *testing.T) {
+	t.Parallel()
 	timeout := 500 * time.Millisecond
 	err := NewJob(
 		WithJobTimeout(timeout),
@@ -34,6 +36,7 @@ func TestJobTimeout(t *testing.T) {
 }
 
 func TestKeepAliveError(t *testing.T) {
+	t.Parallel()
 	err := NewJob(
 		WithJobTimeout(1*time.Second),
 		WithRetryMaxTimes(3),
@@ -53,6 +56,7 @@ func TestKeepAliveError(t *testing.T) {
 }
 
 func TestRetryMaxTimes(t *testing.T) {
+	t.Parallel()
 	timeout := 1 * time.Second
 	err := NewJob(
 		WithJobTimeout(timeout),
@@ -70,6 +74,7 @@ func TestRetryMaxTimes(t *testing.T) {
 }
 
 func TestExternalCancel(t *testing.T) {
+	t.Parallel()
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	cancelFunc()
 	err := NewJob(WithContext(ctx), WithJobTimeout(1*time.Second)).Execute()
@@ -77,6 +82,7 @@ func TestExternalCancel(t *testing.T) {
 }
 
 func TestJobFuncPaninc(t *testing.T) {
+	t.Parallel()
 	err := NewJob(
 		WithJobTimeout(10*time.Second),
 		WithJobFunc(func(context.Context, *job, uint) error {
@@ -87,6 +93,7 @@ func TestJobFuncPaninc(t *testing.T) {
 }
 
 func TestKeepAliveFuncPaninc(t *testing.T) {
+	t.Parallel()
 	err := NewJob(
 		WithJobTimeout(10*time.Second),
 		WithJobFunc(func(context.Context, *job, uint) error {
@@ -103,6 +110,7 @@ func TestKeepAliveFuncPaninc(t *testing.T) {
 }
 
 func TestRetryIntervalFuncPanic(t *testing.T) {
+	t.Parallel()
 	err := NewJob(
 		WithJobTimeout(10*time.Second),
 		WithJobFunc(func(context.Context, *job, uint) error {
@@ -117,6 +125,7 @@ func TestRetryIntervalFuncPanic(t *testing.T) {
 }
 
 func TestRetryWaitTimeFunc(t *testing.T) {
+	t.Parallel()
 	t.SkipNow()
 	err := NewJob(
 		WithJobTimeout(100*time.Second),
