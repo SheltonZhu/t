@@ -17,6 +17,7 @@ import (
 )
 
 func TestLocalDiskFileStorage(t *testing.T) {
+	t.Parallel()
 	// 创建临时目录作为存储路径
 	tempDir, err := os.MkdirTemp(".", "local_disk_storage_test")
 	if err != nil {
@@ -54,12 +55,13 @@ func TestLocalDiskFileStorage(t *testing.T) {
 }
 
 func TestLocalDiskFileStorageErr(t *testing.T) {
+	t.Parallel()
 	// 创建本地磁盘存储实例
 	storage := NewLocalDiskFileStorage("not_exists")
 
 	f := isDirExists("not_exists")
 	assert.False(t, f)
-	
+
 	_, err := storage.GetFile("not_exists")
 	assert.Error(t, err, "Failed to read file content")
 
@@ -68,6 +70,7 @@ func TestLocalDiskFileStorageErr(t *testing.T) {
 }
 
 func TestHttpFileStorage(t *testing.T) {
+	t.Parallel()
 	// mock 实现
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 这里构造 mock 的具体处理细节
@@ -125,6 +128,7 @@ func TestHttpFileStorage(t *testing.T) {
 }
 
 func TestHttpFileStorageErr(t *testing.T) {
+	t.Parallel()
 	// mock 实现
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 这里构造 mock 的具体处理细节
@@ -196,6 +200,7 @@ func TestHttpFileStorageErr(t *testing.T) {
 }
 
 func TestFileStorageErr(t *testing.T) {
+	t.Parallel()
 	// 创建内存存储实例
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -265,6 +270,7 @@ func TestFileStorageErr(t *testing.T) {
 }
 
 func TestBatchFileStorage(t *testing.T) {
+	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -316,52 +322,63 @@ func TestBatchFileStorage(t *testing.T) {
 }
 
 func TestConcurrentBatchFileStorage(t *testing.T) {
+	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockFileGetSaveCleaner := mock_storage.NewMockFileGetSaveCleaner(ctrl)
-	mockFileGetSaveCleaner.EXPECT().
-		SaveFile(gomock.Any(), gomock.Any()).
-		Return("test.txt", nil).AnyTimes()
-	mockFileGetSaveCleaner.EXPECT().
-		GetFile("cfile1.txt").
-		Return(io.NopCloser(bytes.NewReader([]byte("This is a test file."))), nil)
-	mockFileGetSaveCleaner.EXPECT().
-		GetFile("cfile2.txt").
-		Return(io.NopCloser(bytes.NewReader([]byte("This is a test file."))), nil)
-	mockFileGetSaveCleaner.EXPECT().
-		CleanFile(gomock.Any()).
-		Return(nil).AnyTimes()
 
-	storage := NewFileStorage(mockFileGetSaveCleaner, func(fs *FileStorage) {
-		fs.SetConcurrencyLimit(10)
-	})
+	storage := NewFileStorage(mockFileGetSaveCleaner, func(fs *FileStorage) {})
 	storage.SetConcurrencyLimit(10)
-	// 批量并发保存文件
-	batchFiles := map[string]io.Reader{
-		"cfile1.txt": bytes.NewReader([]byte("File 1 content")),
-		"cfile2.txt": bytes.NewReader([]byte("File 2 content")),
-	}
-	_, err := storage.ConcurrentBatchSaveFiles(batchFiles)
-	assert.NoError(t, err, "Failed to concurrent batch save files")
+	t.Run("Concurrent batch save file", func(t *testing.T) {
+		mockFileGetSaveCleaner.EXPECT().
+			SaveFile(gomock.Any(), gomock.Any()).
+			Return("test.txt", nil).AnyTimes()
 
-	// 批量并发获取文件
-	batchFilenames := []string{"cfile1.txt", "cfile2.txt"}
-	retrievedFiles, err := storage.ConcurrentBatchGetFiles(batchFilenames)
-	defer func() {
-		for _, fileReadCloser := range retrievedFiles {
-			err := fileReadCloser.Close()
-			assert.NoError(t, err)
+		// 批量并发保存文件
+		batchFiles := map[string]io.Reader{
+			"cfile1.txt": bytes.NewReader([]byte("File 1 content")),
+			"cfile2.txt": bytes.NewReader([]byte("File 2 content")),
 		}
+		_, err := storage.ConcurrentBatchSaveFiles(batchFiles)
+		assert.NoError(t, err, "Failed to concurrent batch save files")
+	})
+
+	batchFilenames := []string{"cfile1.txt", "cfile2.txt"}
+	t.Run("Concurrent batch get file", func(t *testing.T) {
+		mockFileGetSaveCleaner.EXPECT().
+			GetFile("cfile1.txt").
+			Return(io.NopCloser(bytes.NewReader([]byte("This is a test file."))), nil)
+
+		mockFileGetSaveCleaner.EXPECT().
+			GetFile("cfile2.txt").
+			Return(io.NopCloser(bytes.NewReader([]byte("This is a test file."))), nil)
+
+		// 批量并发获取文件
+		retrievedFiles, err := storage.ConcurrentBatchGetFiles(batchFilenames)
+		defer func() {
+			for _, fileReadCloser := range retrievedFiles {
+				err := fileReadCloser.Close()
+				assert.NoError(t, err)
+			}
+
+		}()
+		assert.NoError(t, err, "Failed to concurrent batch get files")
+		for idx, fileReader := range retrievedFiles {
+			retrievedContent, err := io.ReadAll(fileReader)
+			assert.NoError(t, err, "Failed to read file content")
+			expectedContent := []byte("This is a test file.")
+			assert.Equal(t, expectedContent, retrievedContent, "Retrieved content does not match for file: %d", idx)
+		}
+	})
+
+	t.Run("Concurrent batch clean file", func(t *testing.T) {
+		mockFileGetSaveCleaner.EXPECT().
+			CleanFile(gomock.Any()).
+			Return(nil).AnyTimes()
+
 		// 批量并发清理
 		err := storage.ConcurrentBatchCleanFiles(batchFilenames)
 		assert.NoError(t, err, "Failed to concurrent batch clean files")
-	}()
-	assert.NoError(t, err, "Failed to concurrent batch get files")
-	for idx, fileReader := range retrievedFiles {
-		retrievedContent, err := io.ReadAll(fileReader)
-		assert.NoError(t, err, "Failed to read file content")
-		expectedContent := []byte("This is a test file.")
-		assert.Equal(t, expectedContent, retrievedContent, "Retrieved content does not match for file: %d", idx)
-	}
+	})
 }
