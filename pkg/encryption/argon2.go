@@ -12,8 +12,7 @@ type Argon2Option func(*argon2Encryptor)
 
 type argon2Encryptor struct {
 	RandomSaltGenerator
-	Ctx      *argon2.Context
-	randSalt string
+	Ctx *argon2.Context
 }
 
 // NewArgon2Encryptor
@@ -38,17 +37,7 @@ func NewArgon2Encryptor(opts ...Argon2Option) *argon2Encryptor {
 
 // Encode 实现了 Encryptor 接口的 Encode 方法
 func (e *argon2Encryptor) Encode(plainPwd string) (string, error) {
-	if e.randSalt == "" {
-		e.randSalt = e.GetRandSalt()
-		defer func() {
-			e.randSalt = ""
-		}()
-	}
-	hash, err := argon2.HashEncoded(e.Ctx, []byte(plainPwd), []byte(e.randSalt))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s$%s", hash, e.randSalt), nil
+	return e.encodeWithSalt(e.GetRandSalt(), plainPwd)
 }
 
 // Verify 实现了 Encryptor 接口的 Verify 方法
@@ -58,15 +47,17 @@ func (e *argon2Encryptor) Verify(hashedPwd string, plainPwd string) bool {
 	if len(pairs) != 7 {
 		return false
 	}
-	e.randSalt = pairs[len(pairs)-1]
-	defer func() {
-		e.randSalt = ""
-	}()
-	hash, err := e.Encode(plainPwd)
+	randSalt := pairs[len(pairs)-1]
+	hash, err := e.encodeWithSalt(randSalt, plainPwd)
 	if err != nil {
 		return false
 	}
 	return hash == hashedPwd
+}
+
+func (e *argon2Encryptor) encodeWithSalt(salt string, plainPwd string) (string, error) {
+	hash, err := argon2.HashEncoded(e.Ctx, []byte(plainPwd), []byte(salt))
+	return fmt.Sprintf("%s$%s", hash, salt), err
 }
 
 var _ Encryptor = (*argon2Encryptor)(nil)

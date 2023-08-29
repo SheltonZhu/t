@@ -42,7 +42,6 @@ func WithConstSalt(salt string) MD5Option {
 type md5Encryptor struct {
 	RandomSaltGenerator
 	constSalt string
-	randSalt  string
 }
 
 // NewMD5Encryptor
@@ -58,20 +57,7 @@ func NewMD5Encryptor(opts ...MD5Option) *md5Encryptor {
 
 // Encode 实现了 Encryptor 接口的 Encode 方法
 func (e *md5Encryptor) Encode(plainPwd string) (string, error) {
-	if e.randSalt == "" {
-		e.randSalt = e.GetRandSalt()
-		defer func() {
-			e.randSalt = ""
-		}()
-	}
-	data := []byte(plainPwd + e.constSalt + e.randSalt)
-	h := md5.New()
-	if _, err := h.Write(data); err != nil {
-		return "", err
-	}
-	hash := hex.EncodeToString(h.Sum(nil))
-	return fmt.Sprintf("$md5$%s$%s", e.randSalt, hash), nil
-
+	return e.encodeWithSalt(e.GetRandSalt(), plainPwd), nil
 }
 
 // Verify 实现了 Encryptor 接口的 Verify 方法
@@ -81,15 +67,15 @@ func (e *md5Encryptor) Verify(hashedPwd string, plainPwd string) bool {
 	if len(pairs) < 3 {
 		return false
 	}
-	e.randSalt = pairs[2]
-	defer func() {
-		e.randSalt = ""
-	}()
-	hash, err := e.Encode(plainPwd)
-	if err != nil {
-		return false
-	}
+	randSalt := pairs[2]
+	hash := e.encodeWithSalt(randSalt, plainPwd) // 不会返回 err
 	return hash == hashedPwd
+}
+
+func (e *md5Encryptor) encodeWithSalt(salt string, plainPwd string) string {
+	hashBytes := md5.Sum([]byte(plainPwd + e.constSalt + salt))
+	hash := hex.EncodeToString(hashBytes[:])
+	return fmt.Sprintf("$md5$%s$%s", salt, hash)
 }
 
 var _ Encryptor = (*md5Encryptor)(nil)
