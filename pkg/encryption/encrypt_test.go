@@ -7,6 +7,7 @@ import (
 )
 
 func TestBcryptEncryptor(t *testing.T) {
+	t.Parallel()
 	bcryptEncryptor := NewBcryptEncryptor(WithCost(10))
 
 	t.Run("Encode and Verify", func(t *testing.T) {
@@ -39,6 +40,7 @@ func TestBcryptEncryptor(t *testing.T) {
 }
 
 func TestNoneEncryptor(t *testing.T) {
+	t.Parallel()
 	noneEncryptor := NewNoneEncryptor()
 
 	t.Run("Encode and Verify", func(t *testing.T) {
@@ -59,6 +61,7 @@ func TestNoneEncryptor(t *testing.T) {
 }
 
 func TestMD5Encryptor(t *testing.T) {
+	t.Parallel()
 	md5Encryptor := NewMD5Encryptor(WithConstSalt("&^@*("), WithRandSaltGen(&RandSaltGen{}))
 
 	t.Run("Encode and Verify", func(t *testing.T) {
@@ -84,6 +87,7 @@ func TestMD5Encryptor(t *testing.T) {
 }
 
 func TestArgon2Encryptor(t *testing.T) {
+	t.Parallel()
 	argon2Encryptor := NewArgon2Encryptor(func(ae *argon2Encryptor) {})
 
 	t.Run("Encode and Verify", func(t *testing.T) {
