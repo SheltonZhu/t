@@ -61,7 +61,9 @@ func (j *job) Execute() error {
 	doneChan := make(chan error)
 
 	go j.runJob(ctx, doneChan)
-	go j.keepAlive(ctx, doneChan)
+	if j.keepAliveEnable {
+		go j.keepAlive(ctx, doneChan)
+	}
 
 	select {
 	case <-ctx.Done(): // 如果上下文被取消，则返回
@@ -111,15 +113,12 @@ func (j *job) runJob(ctx context.Context, doneChan chan<- error) {
 	return
 }
 
-func (j *job) keepAlive(ctx context.Context, keepAliveChan chan<- error) {
+func (j *job) keepAlive(ctx context.Context, keepAliveErrChan chan<- error) {
 	defer func() {
 		if err := recover(); err != nil {
-			keepAliveChan <- err.(error)
+			keepAliveErrChan <- err.(error)
 		}
 	}()
-	if !j.keepAliveEnable {
-		return
-	}
 
 	ticker := time.NewTicker(j.keepAliveInterval)
 	for {
@@ -129,7 +128,7 @@ func (j *job) keepAlive(ctx context.Context, keepAliveChan chan<- error) {
 			return
 		case <-ticker.C:
 			if err := j.keepAliveFunc(ctx, j); err != nil {
-				keepAliveChan <- err
+				keepAliveErrChan <- err
 			}
 		}
 	}
