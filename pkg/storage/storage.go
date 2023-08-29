@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"sync"
 
 	"github.com/go-kratos/kratos/pkg/sync/errgroup"
 	"github.com/pkg/errors"
@@ -150,12 +151,15 @@ func (fs *FileStorage) ConcurrentBatchSaveFiles(files map[string]io.Reader) (map
 	g := &errgroup.Group{}
 	g.GOMAXPROCS(int(fs.ConcurrencyLimit))
 
+	mutex := sync.Mutex{} // 添加互斥锁
 	filePaths := make(map[string]string, len(files))
 	for filePath, file := range files {
 		filePath, file := filePath, file
 		g.Go(func(ctx context.Context) error {
 			fp, err := fs.SaveFile(file, filePath)
+			mutex.Lock() // 加锁
 			filePaths[filePath] = fp
+			mutex.Unlock() // 解锁
 			if err != nil {
 				return errors.Wrapf(err, "failed to concurrent save file, path: %s", filePath)
 			}
@@ -172,12 +176,15 @@ func (fs *FileStorage) ConcurrentBatchGetFiles(filePaths []string) ([]io.ReadClo
 	g.GOMAXPROCS(int(fs.ConcurrencyLimit))
 	for idx, filePath := range filePaths {
 		idx, filePath := idx, filePath // https://golang.org/doc/faq#closures_and_goroutines
+		mutex := sync.Mutex{}          // 添加互斥锁
 		g.Go(func(ctx context.Context) error {
 			fileReadCloser, err := fs.GetFile(filePath)
 			if err != nil {
 				return errors.Wrapf(err, "failed to con current get file, path: %s", filePath)
 			}
+			mutex.Lock() // 加锁
 			fileReadClosers[idx] = fileReadCloser
+			mutex.Unlock() // 解锁
 			return nil
 		})
 	}
