@@ -11,13 +11,14 @@ import (
 
 	mock_storage "t/mocks/storage"
 
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/go-resty/resty/v2"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLocalDiskFileStorage(t *testing.T) {
-	t.Parallel()
+
 	// 创建临时目录作为存储路径
 	tempDir, err := os.MkdirTemp(".", "local_disk_storage_test")
 	if err != nil {
@@ -31,46 +32,65 @@ func TestLocalDiskFileStorage(t *testing.T) {
 	// 创建本地磁盘存储实例
 	storage := NewLocalDiskFileStorage(tempDir)
 
-	// 保存文件
 	fileContent := []byte("This is a test file.")
 	fileName := "test.txt"
-	_, err = storage.SaveFileBytes(fileContent, fileName)
-	assert.NoError(t, err, "Failed to save file")
+	t.Run("Save file", func(t *testing.T) {
+		// 保存文件
+		fileName := "test.txt"
+		_, err = storage.SaveFileBytes(fileContent, fileName)
+		assert.NoError(t, err, "Failed to save file")
+	})
 
-	// 获取文件
-	retrievedContent, err := storage.GetFileBytes(fileName)
-	assert.NoError(t, err, "Failed to read file content")
-	assert.Equal(t, fileContent, retrievedContent, "Retrieved file content does not match")
+	t.Run("Get file", func(t *testing.T) {
+		// 获取文件
+		retrievedContent, err := storage.GetFileBytes(fileName)
+		assert.NoError(t, err, "Failed to read file content")
+		assert.Equal(t, fileContent, retrievedContent, "Retrieved file content does not match")
+		// 修改响应值
+		newBytes := []byte("12345")
+		storage.OnAfterResponse(func(fs *FileStorage, bs *[]byte) { *bs = newBytes })
+		retrievedContent, err = storage.GetFileBytes(fileName)
+		assert.NoError(t, err, "Failed to read file content")
+		assert.Equal(t, newBytes, retrievedContent, "Retrieved file content does not match")
+	})
 
-	// 修改响应值
-	newBytes := []byte("12345")
-	storage.OnAfterResponse(func(fs *FileStorage, bs *[]byte) { *bs = newBytes })
-	retrievedContent, err = storage.GetFileBytes(fileName)
-	assert.NoError(t, err, "Failed to read file content")
-	assert.Equal(t, newBytes, retrievedContent, "Retrieved file content does not match")
+	t.Run("Clean file", func(t *testing.T) {
+		// 清理文件
+		err = storage.CleanFile(fileName)
+		assert.NoError(t, err)
+	})
 
-	// 清理文件
-	err = storage.CleanFile(fileName)
-	assert.NoError(t, err)
 }
 
 func TestLocalDiskFileStorageErr(t *testing.T) {
-	t.Parallel()
+
 	// 创建本地磁盘存储实例
-	storage := NewLocalDiskFileStorage("not_exists")
+	storage := NewLocalDiskFileStorage("path/to/")
 
-	f := isDirExists("not_exists")
-	assert.False(t, f)
+	t.Run("File not exists", func(t *testing.T) {
+		f := isDirExists("not_exists")
+		assert.False(t, f)
 
-	_, err := storage.GetFile("not_exists")
-	assert.Error(t, err, "Failed to read file content")
+		_, err := storage.GetFile("not_exists")
+		assert.Error(t, err)
 
-	err = storage.CleanFile("not_exists")
-	assert.Error(t, err)
+		err = storage.CleanFile("not_exists")
+		assert.Error(t, err)
+	})
+
+	t.Run("Failed to mkdir", func(t *testing.T) {
+		stubs := gomonkey.ApplyFunc(os.MkdirAll, func(path string, perm os.FileMode) error {
+			return assert.AnError
+		})
+
+		defer stubs.Reset()
+		_, err := storage.SaveFileBytes([]byte("test"), "a/b/t.txt")
+		assert.ErrorIs(t, err, assert.AnError)
+	})
 }
 
 func TestHttpFileStorage(t *testing.T) {
-	t.Parallel()
+
 	// mock 实现
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 这里构造 mock 的具体处理细节
@@ -128,7 +148,7 @@ func TestHttpFileStorage(t *testing.T) {
 }
 
 func TestHttpFileStorageErr(t *testing.T) {
-	t.Parallel()
+
 	// mock 实现
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 这里构造 mock 的具体处理细节
@@ -151,10 +171,10 @@ func TestHttpFileStorageErr(t *testing.T) {
 		)
 
 		_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
-		assert.Error(t, err, "Failed to save file")
+		assert.Error(t, err)
 
 		_, err = storage.GetFileBytes("test.txt")
-		assert.Error(t, err, "Failed to save file")
+		assert.Error(t, err)
 	})
 
 	t.Run("Response error", func(t *testing.T) {
@@ -171,10 +191,10 @@ func TestHttpFileStorageErr(t *testing.T) {
 		)
 
 		_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
-		assert.Error(t, err, "Failed to save file")
+		assert.Error(t, err)
 
 		_, err = storage.GetFileBytes("test.txt")
-		assert.Error(t, err, "Failed to save file")
+		assert.Error(t, err)
 	})
 
 	t.Run("Request api parse error", func(t *testing.T) {
@@ -192,20 +212,35 @@ func TestHttpFileStorageErr(t *testing.T) {
 		)
 
 		_, err := storage.SaveFileBytes([]byte("This is a test file."), "test.txt")
-		assert.Error(t, err, "Failed to save file")
+		assert.Error(t, err)
 
 		_, err = storage.GetFileBytes("test.txt")
-		assert.Error(t, err, "Failed to save file")
+		assert.Error(t, err)
 	})
 }
 
 func TestFileStorageErr(t *testing.T) {
-	t.Parallel()
+
 	// 创建内存存储实例
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockFileGetSaveCleaner := mock_storage.NewMockFileGetSaveCleaner(ctrl)
+	storage := NewFileStorage(mockFileGetSaveCleaner)
+
+	t.Run("Failed to io.ReadAll", func(t *testing.T) {
+		stubs := gomonkey.ApplyFunc(io.ReadAll, func(io.Reader) ([]byte, error) {
+			return nil, assert.AnError
+		})
+
+		defer stubs.Reset()
+		mockFileGetSaveCleaner.EXPECT().
+			GetFile("read.txt").
+			Return(io.NopCloser(bytes.NewReader([]byte("test"))), nil).AnyTimes()
+		// 获取文件
+		_, err := storage.GetFileBytes("read.txt")
+		assert.Error(t, err)
+	})
+
 	mockFileGetSaveCleaner.EXPECT().
 		SaveFile(gomock.Any(), gomock.Any()).
 		Return("", assert.AnError).AnyTimes()
@@ -215,19 +250,16 @@ func TestFileStorageErr(t *testing.T) {
 	mockFileGetSaveCleaner.EXPECT().
 		CleanFile(gomock.Any()).
 		Return(assert.AnError).AnyTimes()
-
-	storage := NewFileStorage(mockFileGetSaveCleaner)
-
 	t.Run("Operate file bytes error", func(t *testing.T) {
 		// 保存文件
 		fileContent := []byte("This is a test file.")
 		fileName := "test.txt"
 		_, err := storage.SaveFileBytes(fileContent, fileName)
-		assert.Error(t, err, "Failed to save file")
+		assert.Error(t, err)
 
 		// 获取文件
 		_, err = storage.GetFileBytes(fileName)
-		assert.Error(t, err, "Failed to read file content")
+		assert.Error(t, err)
 
 		// 清理文件
 		err = storage.CleanFile(fileName)
@@ -243,34 +275,34 @@ func TestFileStorageErr(t *testing.T) {
 	t.Run("batch operate file reader error", func(t *testing.T) {
 		// 批量保存文件
 		_, errs := storage.BatchSaveFiles(batchFiles)
-		assert.NotZero(t, len(errs), "Failed to batch save files")
+		assert.NotZero(t, len(errs))
 
 		// 批量获取文件
 		_, errs = storage.BatchGetFiles(batchFilenames)
-		assert.NotZero(t, len(errs), "Failed to batch get files")
+		assert.NotZero(t, len(errs))
 
 		// 批量清理
 		errs = storage.BatchCleanFiles(batchFilenames)
-		assert.NotZero(t, len(errs), "Failed to batch clean files")
+		assert.NotZero(t, len(errs))
 	})
 
 	t.Run("Concurrent batch operate file reader error", func(t *testing.T) {
 		// 批量并发保存文件
 		_, err := storage.ConcurrentBatchSaveFiles(batchFiles)
-		assert.Error(t, err, "Failed to concurrent batch save files")
+		assert.Error(t, err)
 
 		// 批量并发保存文件
 		_, err = storage.ConcurrentBatchGetFiles(batchFilenames)
-		assert.Error(t, err, "Failed to concurrent batch save files")
+		assert.Error(t, err)
 
 		// 批量并发清理文件
 		err = storage.ConcurrentBatchCleanFiles(batchFilenames)
-		assert.Error(t, err, "Failed to concurrent batch clean files")
+		assert.Error(t, err)
 	})
 }
 
 func TestBatchFileStorage(t *testing.T) {
-	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -312,17 +344,17 @@ func TestBatchFileStorage(t *testing.T) {
 		errs := storage.BatchCleanFiles(batchFilenames)
 		assert.Zero(t, len(errs), "Failed to batch clean files")
 	}()
-	assert.Zero(t, len(errs), "Failed to batch get files")
+	assert.Zero(t, len(errs))
 	for idx, fileReader := range retrievedFiles {
 		retrievedContent, err := io.ReadAll(fileReader)
-		assert.NoError(t, err, "Failed to read file content")
+		assert.NoError(t, err)
 		expectedContent := []byte("This is a test file.")
 		assert.Equal(t, expectedContent, retrievedContent, "Retrieved content does not match for file: %d", idx)
 	}
 }
 
 func TestConcurrentBatchFileStorage(t *testing.T) {
-	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

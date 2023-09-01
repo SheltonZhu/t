@@ -3,6 +3,7 @@ module t
 go 1.20
 
 require (
+	github.com/agiledragon/gomonkey/v2 v2.10.1
 	github.com/go-kratos/kratos v1.0.1
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/golang/mock v1.3.1

@@ -1,13 +1,11 @@
 package storage
 
 import (
+	"github.com/pkg/errors"
 	"io"
 	"os"
-	"path"
-	"github.com/pkg/errors"
 	"path/filepath"
 )
-
 
 type localDiskFileStorage struct {
 	basePath string
@@ -32,7 +30,7 @@ func isDirExists(dirPath string) bool {
 // SaveFile 实现了 FileSaver 接口的 SaveFile 方法
 func (s *localDiskFileStorage) SaveFile(file io.Reader, filePath string) (string, error) {
 	filePath = filepath.Join(s.basePath, filePath)
-	fileDir := path.Dir(filePath)
+	fileDir := filepath.Dir(filePath)
 	if !isDirExists(fileDir) {
 		if err := os.MkdirAll(fileDir, 0755); err != nil {
 			return "", errors.Wrap(err, "failed to save file")
@@ -46,7 +44,7 @@ func (s *localDiskFileStorage) SaveFile(file io.Reader, filePath string) (string
 
 	_, err = io.Copy(outputFile, file)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to save file") 
+		return "", errors.Wrap(err, "failed to save file")
 	}
 
 	return filePath, nil
