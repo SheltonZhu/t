@@ -1,38 +1,45 @@
 package storage
 
 import (
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 type localDiskFileStorage struct {
 	basePath string
 }
 
-// NewLocalDiskFileGetSaveCleaner
+// NewLocalDiskFileGetSaveCleaner creates a new local disk file storage for the given path.
 func NewLocalDiskFileGetSaveCleaner(basePath string) *localDiskFileStorage {
 	return &localDiskFileStorage{basePath: basePath}
 }
 
 // IsDirExists 判断文件夹是否存在
-func isDirExists(dirPath string) bool {
+func isDirExists(dirPath string) (bool, error) {
 	info, err := os.Stat(dirPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
+	if err == nil {
+		return info.IsDir(), nil
 	}
-	return info.IsDir()
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 // SaveFile 实现了 FileSaver 接口的 SaveFile 方法
 func (s *localDiskFileStorage) SaveFile(file io.Reader, filePath string) (string, error) {
 	filePath = filepath.Join(s.basePath, filePath)
 	fileDir := filepath.Dir(filePath)
-	if !isDirExists(fileDir) {
-		if err := os.MkdirAll(fileDir, 0755); err != nil {
+	dirExists, err := isDirExists(fileDir)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to save file")
+	}
+
+	if !dirExists {
+		if err := os.MkdirAll(fileDir, 0o755); err != nil {
 			return "", errors.Wrap(err, "failed to save file")
 		}
 	}

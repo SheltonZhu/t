@@ -46,10 +46,10 @@ type batchHandler interface {
 	ConcurrentBatchCleanFiles(filePaths []string) error
 }
 
-// FileStorage 定义文件仓储接口
-// 实现一个新的存储只需要实现FileGetSaveCleaner接口
-//
 //go:generate mockgen -source=storage.go -destination=../../mocks/storage/mock_storage.go -package=mock_storage
+
+// IFileStorage 定义文件仓储接口
+// 实现一个新的存储只需要实现FileGetSaveCleaner接口
 type IFileStorage interface {
 	FileGetSaveCleaner
 	fileStorageBytesHandler
@@ -134,7 +134,7 @@ func (fs *FileStorage) BatchCleanFiles(filePaths []string) []error {
 	return errs
 }
 
-// SetResponseHandle 设置响应体hook函数
+// OnAfterResponse 置响应体hook函数
 func (fs *FileStorage) OnAfterResponse(f func(*FileStorage, *[]byte)) *FileStorage {
 	fs.afterResponse = append(fs.afterResponse, f)
 	return fs
@@ -235,7 +235,7 @@ func NewHttpFileStorage(apiConfig APIConfig, opts ...HttpFileStorageOption) *Fil
 	return NewFileStorage(NewHttpFileGetSaveCleaner(apiConfig, opts...))
 }
 
-// NewlocalDiskFileStorage 创建一个本地文件仓储
+// NewLocalDiskFileStorage 创建一个本地文件仓储
 func NewLocalDiskFileStorage(basePath string) *FileStorage {
 	return NewFileStorage(NewLocalDiskFileGetSaveCleaner(basePath))
 }

@@ -1,11 +1,12 @@
 package storage
 
 import (
-	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -121,7 +122,7 @@ func OnBeforeGetFile(f func(*httpFileStorage, *resty.Request)) HttpFileStorageOp
 	}
 }
 
-// NewHttpFileGetSaveCleaner
+// NewHttpFileGetSaveCleaner returns a new HttpFileGetSaveCleaner
 func NewHttpFileGetSaveCleaner(apiConfig APIConfig, opts ...HttpFileStorageOption) *httpFileStorage {
 	if apiConfig.Schema == "" {
 		apiConfig.Schema = "http"
