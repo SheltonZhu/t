@@ -55,6 +55,14 @@ func SetDebug(bodyLimit ...int64) HttpFileStorageOption {
 	}
 }
 
+// SetLogger 设置logger
+// 如果手动设置了restyClient需要放在其后
+func SetLogger(logger resty.Logger) HttpFileStorageOption {
+	return func(s *httpFileStorage) {
+		s.HttpClient.SetLogger(logger)
+	}
+}
+
 // WithHttpHeader 设置公共请求头
 // 如果手动设置了restyClient需要放在其后
 func WithHttpHeader(key, val string) HttpFileStorageOption {

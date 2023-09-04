@@ -12,6 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type MyLogger struct{}
+
+func (l *MyLogger) Errorf(format string, v ...interface{}) {}
+func (l *MyLogger) Warnf(format string, v ...interface{})  {}
+func (l *MyLogger) Debugf(format string, v ...interface{}) {}
+
 func TestNewHttpFileGetSaveCleaner(t *testing.T) {
 	t.Parallel()
 	// mock 实现
@@ -28,6 +34,7 @@ func TestNewHttpFileGetSaveCleaner(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	myLogger := &MyLogger{}
 	// 创建http存储实例
 	storage := NewHttpFileStorage(
 		APIConfig{
@@ -42,6 +49,7 @@ func TestNewHttpFileGetSaveCleaner(t *testing.T) {
 		WithHttpTrace(),
 		WithHttpBasicAuth("user", "user"),
 		SetDebug(1000),
+		SetLogger(myLogger),
 		SetHttps(),
 		OnBeforeGetFile(func(s *httpFileStorage, r *resty.Request) {
 			r.SetQueryParam("test", "1")
