@@ -1,17 +1,17 @@
-package job
+package executor
 
 import (
 	"context"
 	"time"
 )
 
-type Job interface {
+type executor interface {
 	Execute() error
 }
 
 // NewJob 创建一个job
-func NewJob(opts ...JobOption) Job {
-	j := newJob()
+func NewJobExecutor(opts ...JobOption) executor {
+	j := newJobExecutor()
 	for _, opt := range opts {
 		opt(j)
 	}
@@ -19,41 +19,41 @@ func NewJob(opts ...JobOption) Job {
 }
 
 // RetryIntervalFunc 重试间隔函数
-type RetryIntervalFunc func(job *job, retryTimes uint, lastWaitDuration time.Duration) time.Duration
+type RetryIntervalFunc func(job *JobExecutor, retryTimes uint, lastWaitDuration time.Duration) time.Duration
 
-type job struct {
+type JobExecutor struct {
 	ctx               context.Context
 	jobTimeout        time.Duration
-	jobFunc           func(context.Context, *job, uint) error
+	jobFunc           func(context.Context, *JobExecutor, uint) error
 	keepAliveEnable   bool
 	keepAliveInterval time.Duration
-	keepAliveFunc     func(context.Context, *job) error
+	keepAliveFunc     func(context.Context, *JobExecutor) error
 	retryMaxTimes     uint
 	retryIntervalFunc RetryIntervalFunc
 }
 
-func newJob() *job {
-	return &job{
+func newJobExecutor() *JobExecutor {
+	return &JobExecutor{
 		ctx: context.Background(),
-		jobFunc: func(ctx context.Context, job *job, retryMaxTimes uint) error {
+		jobFunc: func(ctx context.Context, job *JobExecutor, retryMaxTimes uint) error {
 			// do some job here
 			return nil
 		},
 		jobTimeout:        10 * time.Minute,
 		keepAliveInterval: 3 * time.Second,
-		keepAliveFunc: func(ctx context.Context, job *job) error {
+		keepAliveFunc: func(ctx context.Context, job *JobExecutor) error {
 			// do something to keep alive
 			return nil
 		},
 		retryMaxTimes: 0,
-		retryIntervalFunc: func(j *job, rt uint, lwd time.Duration) time.Duration {
+		retryIntervalFunc: func(j *JobExecutor, rt uint, lwd time.Duration) time.Duration {
 			return time.Duration(1<<rt) * time.Second
 		},
 	}
 }
 
 // Execute 执行job
-func (j *job) Execute() error {
+func (j *JobExecutor) Execute() error {
 	timeoutErr := JobTimeoutErr{timeout: j.jobTimeout}
 	ctx, cancelFunc := context.WithTimeoutCause(j.ctx, j.jobTimeout, timeoutErr)
 	defer cancelFunc()
@@ -76,7 +76,7 @@ func (j *job) Execute() error {
 	}
 }
 
-func (j *job) runJob(ctx context.Context, doneChan chan<- error) {
+func (j *JobExecutor) runJob(ctx context.Context, doneChan chan<- error) {
 	var err error
 	defer func() {
 		if err := recover(); err != nil {
@@ -109,11 +109,9 @@ func (j *job) runJob(ctx context.Context, doneChan chan<- error) {
 			return
 		}
 	}
-
-	return
 }
 
-func (j *job) keepAlive(ctx context.Context, keepAliveErrChan chan<- error) {
+func (j *JobExecutor) keepAlive(ctx context.Context, keepAliveErrChan chan<- error) {
 	defer func() {
 		if err := recover(); err != nil {
 			keepAliveErrChan <- err.(error)
