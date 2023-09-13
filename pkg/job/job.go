@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-type Job interface {
+type IJob interface {
 	Execute() error
 }
 
 // NewJob 创建一个job
-func NewJob(opts ...JobOption) Job {
+func NewJob(opts ...JobOption) IJob {
 	j := newJob()
 	for _, opt := range opts {
 		opt(j)
@@ -19,41 +19,41 @@ func NewJob(opts ...JobOption) Job {
 }
 
 // RetryIntervalFunc 重试间隔函数
-type RetryIntervalFunc func(job *job, retryTimes uint, lastWaitDuration time.Duration) time.Duration
+type RetryIntervalFunc func(job *Job, retryTimes uint, lastWaitDuration time.Duration) time.Duration
 
-type job struct {
+type Job struct {
 	ctx               context.Context
 	jobTimeout        time.Duration
-	jobFunc           func(context.Context, *job, uint) error
+	jobFunc           func(context.Context, *Job, uint) error
 	keepAliveEnable   bool
 	keepAliveInterval time.Duration
-	keepAliveFunc     func(context.Context, *job) error
+	keepAliveFunc     func(context.Context, *Job) error
 	retryMaxTimes     uint
 	retryIntervalFunc RetryIntervalFunc
 }
 
-func newJob() *job {
-	return &job{
+func newJob() *Job {
+	return &Job{
 		ctx: context.Background(),
-		jobFunc: func(ctx context.Context, job *job, retryMaxTimes uint) error {
+		jobFunc: func(ctx context.Context, job *Job, retryMaxTimes uint) error {
 			// do some job here
 			return nil
 		},
 		jobTimeout:        10 * time.Minute,
 		keepAliveInterval: 3 * time.Second,
-		keepAliveFunc: func(ctx context.Context, job *job) error {
+		keepAliveFunc: func(ctx context.Context, job *Job) error {
 			// do something to keep alive
 			return nil
 		},
 		retryMaxTimes: 0,
-		retryIntervalFunc: func(j *job, rt uint, lwd time.Duration) time.Duration {
+		retryIntervalFunc: func(j *Job, rt uint, lwd time.Duration) time.Duration {
 			return time.Duration(1<<rt) * time.Second
 		},
 	}
 }
 
 // Execute 执行job
-func (j *job) Execute() error {
+func (j *Job) Execute() error {
 	timeoutErr := JobTimeoutErr{timeout: j.jobTimeout}
 	ctx, cancelFunc := context.WithTimeoutCause(j.ctx, j.jobTimeout, timeoutErr)
 	defer cancelFunc()
@@ -76,7 +76,7 @@ func (j *job) Execute() error {
 	}
 }
 
-func (j *job) runJob(ctx context.Context, doneChan chan<- error) {
+func (j *Job) runJob(ctx context.Context, doneChan chan<- error) {
 	var err error
 	defer func() {
 		if err := recover(); err != nil {
@@ -113,7 +113,7 @@ func (j *job) runJob(ctx context.Context, doneChan chan<- error) {
 	return
 }
 
-func (j *job) keepAlive(ctx context.Context, keepAliveErrChan chan<- error) {
+func (j *Job) keepAlive(ctx context.Context, keepAliveErrChan chan<- error) {
 	defer func() {
 		if err := recover(); err != nil {
 			keepAliveErrChan <- err.(error)
