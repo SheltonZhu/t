@@ -89,7 +89,7 @@ func TestJobFuncPaninc(t *testing.T) {
 			panic(assert.AnError)
 		}),
 	).Execute()
-	assert.ErrorIs(t, err, assert.AnError)
+	assert.Error(t, err)
 }
 
 func TestKeepAliveFuncPaninc(t *testing.T) {
@@ -121,7 +121,7 @@ func TestRetryIntervalFuncPanic(t *testing.T) {
 			panic(assert.AnError)
 		}),
 	).Execute()
-	assert.ErrorIs(t, err, assert.AnError)
+	assert.Error(t, err)
 }
 
 func TestRetryWaitTimeFunc(t *testing.T) {

@@ -3,6 +3,8 @@ package executor
 import (
 	"context"
 	"time"
+
+	"github.com/marmotedu/errors"
 )
 
 type executor interface {
@@ -10,7 +12,7 @@ type executor interface {
 }
 
 // NewJob 创建一个job
-func NewJobExecutor(opts ...JobOption) executor {
+func NewJobExecutor(opts ...Option) executor {
 	j := newJobExecutor()
 	for _, opt := range opts {
 		opt(j)
@@ -79,8 +81,8 @@ func (j *JobExecutor) Execute() error {
 func (j *JobExecutor) runJob(ctx context.Context, doneChan chan<- error) {
 	var err error
 	defer func() {
-		if err := recover(); err != nil {
-			doneChan <- err.(error)
+		if r := recover(); r != nil {
+			doneChan <- errors.Errorf("panic: %v", r)
 		}
 		doneChan <- err
 	}()
