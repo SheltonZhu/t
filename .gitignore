@@ -44,3 +44,6 @@ go.work
 
 # coverage.html
 coverage.html
+
+# vscode
+/.vscode/**
