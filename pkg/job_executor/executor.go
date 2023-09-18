@@ -96,8 +96,7 @@ func (j *JobExecutor) runJob(ctx context.Context, doneChan chan<- error) {
 	nextDelay := time.Duration(0)
 	// 出错等待一阵子重试
 	for i := uint(0); i < j.retryMaxTimes; i++ {
-		err = j.jobFunc(ctx, j, i)
-		if err == nil {
+		if err = j.jobFunc(ctx, j, i); err == nil {
 			return
 		}
 
