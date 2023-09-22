@@ -31,6 +31,9 @@ func isDirExists(dirPath string) (bool, error) {
 
 // SaveFile 实现了 FileSaver 接口的 SaveFile 方法
 func (s *localDiskFileStorage) SaveFile(file io.Reader, filePath string) (string, error) {
+	if filePath == "" {
+		return "", errors.New("file path is empty")
+	}
 	filePath = filepath.Join(s.basePath, filePath)
 	fileDir := filepath.Dir(filePath)
 	dirExists, err := isDirExists(fileDir)
@@ -59,6 +62,9 @@ func (s *localDiskFileStorage) SaveFile(file io.Reader, filePath string) (string
 
 // GetFile 实现了 FileGetter 接口的 GetFile 方法
 func (s *localDiskFileStorage) GetFile(filePath string) (io.ReadCloser, error) {
+	if filePath == "" {
+		return nil, errors.New("file path is empty")
+	}
 	filePath = filepath.Join(s.basePath, filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
