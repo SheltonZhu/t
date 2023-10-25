@@ -26,3 +26,14 @@ func TestArgon2Encryptor(t *testing.T) {
 		assert.False(t, ok)
 	})
 }
+
+func TestXxx(t *testing.T) {
+	e := NewArgon2Encryptor()
+	hash, _ := e.Encode("123123123123")
+	_ = hash
+	ok := e.Verify(
+		"$argon2i$v=19$m=12,t=2,p=1$/bJp+TDWOO0KdyriRkILvdkm6GoGdl8t5RqDreWAX3s$DznndClCzojpMe8A1Egv6GejMpFJDiO0GVF4gL2L1wA",
+		"12312",
+	)
+	_ = ok
+}
